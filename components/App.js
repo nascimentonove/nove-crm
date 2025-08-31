@@ -1,293 +1,277 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 
-/** ——— UTIL ——— */
-const hojeISO = () => new Date().toISOString().slice(0, 10);
-const uid = () => Math.random().toString(36).slice(2, 9);
+// Simulação v2: inclui "Data do primeiro contato" e "Observações (500c)" no fluxo passo a passo.
+// Fluxo: Login → Feed → Cadastro (Nome, Produto, Valor, Telefone, Data, Canal, Status, Observações, Mídia) → Detalhe.
 
-/** ——— TIPOS ——— */
-const STATUS = ["Novo", "Em contato", "Proposta", "Fechado", "Perdido"];
-const CANAIS = ["WhatsApp", "Instagram", "Telefone", "Indicação", "Visita"];
+const APP_NAME = "Nove CRM";
+const APP_SLOGAN = "Organize seus clientes, organize seus resultados.";
+const BRAND_COLOR = "#16A34A"; // verde claro
 
-/** ——— ARMAZENAMENTO ——— */
-const STORAGE_KEY = "novecrm_leads_v1";
+const STATUSES = [
+  { value: "em_negociacao", label: "Em negociação" },
+  { value: "resposta_7d", label: "Resposta em até 7 dias" },
+  { value: "prazo_10d_mais", label: "Prazo > 10 dias" },
+  { value: "sinalizacao_positiva", label: "Positivo" },
+  { value: "sinalizacao_negativa", label: "Negativo" },
+];
 
-function loadLeads() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
+const CHANNELS = [
+  { value: "visita", label: "Visita" },
+  { value: "ligacao", label: "Ligação" },
+];
+
+function statusClasses(v){
+  switch(v){
+    case "sinalizacao_positiva": return "bg-green-100 text-green-800 border-green-200";
+    case "sinalizacao_negativa": return "bg-red-100 text-red-800 border-red-200";
+    case "resposta_7d": return "bg-amber-100 text-amber-800 border-amber-200";
+    case "prazo_10d_mais": return "bg-blue-100 text-blue-800 border-blue-200";
+    case "em_negociacao":
+    default: return "bg-neutral-100 text-neutral-800 border-neutral-200";
   }
 }
 
-function saveLeads(leads) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(leads));
-}
-
-/** ——— APP ——— */
-export default function App() {
-  const [leads, setLeads] = useState([]);
-  const [q, setQ] = useState("");
-
-  // formulário
-  const [form, setForm] = useState({
-    id: null,
-    nome: "",
-    telefone: "",
-    canal: "WhatsApp",
-    status: "Novo",
-    dataPrimeiroContato: hojeISO(), // <- preenche com a data de hoje
-    observacoes: "", // <- até 500 caracteres
-  });
-
-  // carregar do localStorage
-  useEffect(() => {
-    setLeads(loadLeads());
-  }, []);
-
-  // salvar sempre que mudar
-  useEffect(() => {
-    saveLeads(leads);
-  }, [leads]);
-
-  const filtrados = useMemo(() => {
-    if (!q.trim()) return leads;
-    const k = q.toLowerCase();
-    return leads.filter(
-      (l) =>
-        l.nome.toLowerCase().includes(k) ||
-        (l.telefone || "").toLowerCase().includes(k) ||
-        (l.observacoes || "").toLowerCase().includes(k)
-    );
-  }, [q, leads]);
-
-  function resetForm() {
-    setForm({
-      id: null,
-      nome: "",
-      telefone: "",
-      canal: "WhatsApp",
-      status: "Novo",
-      dataPrimeiroContato: hojeISO(),
-      observacoes: "",
-    });
-  }
-
-  function handleSubmit(e) {
-    e.preventDefault();
-    const payload = { ...form, id: form.id || uid() };
-    // validações simples
-    if (!payload.nome.trim()) {
-      alert("Informe o nome.");
-      return;
-    }
-    if (payload.observacoes.length > 500) {
-      alert("Observações deve ter no máximo 500 caracteres.");
-      return;
-    }
-
-    setLeads((prev) => {
-      const exists = prev.some((l) => l.id === payload.id);
-      return exists
-        ? prev.map((l) => (l.id === payload.id ? payload : l))
-        : [{ ...payload }, ...prev];
-    });
-    resetForm();
-  }
-
-  function editar(lead) {
-    setForm({ ...lead });
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  function remover(id) {
-    if (confirm("Remover este registro?")) {
-      setLeads((prev) => prev.filter((l) => l.id !== id));
-    }
-  }
-
+function Header({ onNew, onLogout }) {
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
-      <div className="max-w-4xl mx-auto p-4 sm:p-6">
-        <h1 className="text-2xl sm:text-3xl font-bold">Nove CRM</h1>
-        <p className="text-slate-300 mb-6">Primeiro protótipo funcional.</p>
-
-        {/* FORMULÁRIO */}
-        <form
-          onSubmit={handleSubmit}
-          className="grid gap-3 bg-slate-900/70 rounded-xl p-4 sm:p-6"
-        >
-          <div className="grid sm:grid-cols-2 gap-3">
-            <label className="grid gap-1">
-              <span className="text-sm text-slate-300">Nome*</span>
-              <input
-                className="bg-slate-800 rounded-lg px-3 py-2 outline-none"
-                value={form.nome}
-                onChange={(e) => setForm({ ...form, nome: e.target.value })}
-                placeholder="Ex.: Maria Silva"
-                required
-              />
-            </label>
-
-            <label className="grid gap-1">
-              <span className="text-sm text-slate-300">Telefone</span>
-              <input
-                className="bg-slate-800 rounded-lg px-3 py-2 outline-none"
-                value={form.telefone}
-                onChange={(e) => setForm({ ...form, telefone: e.target.value })}
-                placeholder="Ex.: (94) 9 9999-9999"
-              />
-            </label>
-          </div>
-
-          <div className="grid sm:grid-cols-3 gap-3">
-            <label className="grid gap-1">
-              <span className="text-sm text-slate-300">Canal</span>
-              <select
-                className="bg-slate-800 rounded-lg px-3 py-2 outline-none"
-                value={form.canal}
-                onChange={(e) => setForm({ ...form, canal: e.target.value })}
-              >
-                {CANAIS.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="grid gap-1">
-              <span className="text-sm text-slate-300">Status</span>
-              <select
-                className="bg-slate-800 rounded-lg px-3 py-2 outline-none"
-                value={form.status}
-                onChange={(e) => setForm({ ...form, status: e.target.value })}
-              >
-                {STATUS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="grid gap-1">
-              <span className="text-sm text-slate-300">
-                Data do primeiro contato
-              </span>
-              <input
-                type="date"
-                className="bg-slate-800 rounded-lg px-3 py-2 outline-none"
-                value={form.dataPrimeiroContato}
-                onChange={(e) =>
-                  setForm({ ...form, dataPrimeiroContato: e.target.value })
-                }
-              />
-            </label>
-          </div>
-
-          <label className="grid gap-1">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-300">Observações</span>
-              <span className="text-xs text-slate-400">
-                {form.observacoes.length}/500
-              </span>
-            </div>
-            <textarea
-              className="bg-slate-800 rounded-lg px-3 py-2 outline-none min-h-[100px]"
-              value={form.observacoes}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  observacoes: e.target.value.slice(0, 500), // limita a 500
-                })
-              }
-              placeholder="Notas rápidas sobre a visita/negociação (até 500 caracteres)"
-            />
-          </label>
-
-          <div className="flex gap-3">
-            <button
-              type="submit"
-              className="bg-emerald-500 hover:bg-emerald-600 transition rounded-lg px-4 py-2 font-medium"
-            >
-              {form.id ? "Salvar alterações" : "Adicionar lead"}
-            </button>
-            {form.id && (
-              <button
-                type="button"
-                onClick={resetForm}
-                className="bg-slate-700 hover:bg-slate-600 transition rounded-lg px-4 py-2"
-              >
-                Cancelar edição
-              </button>
-            )}
-          </div>
-        </form>
-
-        {/* BUSCA */}
-        <div className="mt-6 flex items-center gap-3">
-          <input
-            className="flex-1 bg-slate-800 rounded-lg px-3 py-2 outline-none"
-            placeholder="Buscar por nome, telefone ou observações…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-          <span className="text-slate-400 text-sm">
-            {filtrados.length} resultado(s)
-          </span>
+    <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-neutral-200">
+      <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <img src="/logo.png" alt="Nove CRM" className="h-7 w-7 rounded-xl" />
+          <span className="font-semibold tracking-tight">{APP_NAME}</span>
         </div>
-
-        {/* LISTA */}
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-slate-300">
-                <th className="py-2 pr-3">Nome</th>
-                <th className="py-2 pr-3">Telefone</th>
-                <th className="py-2 pr-3">Canal</th>
-                <th className="py-2 pr-3">Status</th>
-                <th className="py-2 pr-3">1º Contato</th>
-                <th className="py-2 pr-3">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtrados.map((l) => (
-                <tr key={l.id} className="border-t border-slate-800">
-                  <td className="py-2 pr-3">{l.nome}</td>
-                  <td className="py-2 pr-3">{l.telefone || "—"}</td>
-                  <td className="py-2 pr-3">{l.canal}</td>
-                  <td className="py-2 pr-3">{l.status}</td>
-                  <td className="py-2 pr-3">{l.dataPrimeiroContato}</td>
-                  <td className="py-2 pr-3">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => editar(l)}
-                        className="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => remover(l.id)}
-                        className="px-2 py-1 rounded bg-rose-600 hover:bg-rose-500"
-                      >
-                        Remover
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {filtrados.length === 0 && (
-                <tr>
-                  <td colSpan="6" className="py-6 text-slate-400">
-                    Nenhum lead ainda. Adicione acima para começar.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <div className="flex items-center gap-2">
+          <button onClick={onNew} className="px-3 py-1.5 rounded-xl text-white text-sm" style={{backgroundColor: BRAND_COLOR}}>+ Nova</button>
+          <button onClick={onLogout} className="px-3 py-1.5 rounded-xl border border-neutral-300 text-sm">Sair</button>
         </div>
       </div>
-    </main>
+    </header>
   );
 }
+
+function Login({ onLogin }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!email || !password) return alert("Preencha e-mail e senha.");
+    onLogin({ email });
+  };
+  return (
+    <div className="min-h-screen grid place-items-center bg-neutral-50 px-4">
+      <div className="w-full max-w-sm rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm text-center">
+        <img src="/logo.png" alt="Nove CRM" className="h-16 mx-auto mb-4" />
+        <h1 className="font-semibold text-xl mb-1">{APP_NAME}</h1>
+        <p className="text-sm text-neutral-600 mb-4">{APP_SLOGAN}</p>
+        <form className="mt-2 space-y-3 text-left" onSubmit={handleSubmit}>
+          <input value={email} onChange={(e)=>setEmail(e.target.value)} type="email" placeholder="E-mail" className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm" />
+          <input value={password} onChange={(e)=>setPassword(e.target.value)} type="password" placeholder="Senha" className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm" />
+          <button type="submit" className="w-full rounded-xl text-white py-2 text-sm" style={{backgroundColor: BRAND_COLOR}}>Entrar</button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function Feed({ posts, onOpenDetail }) {
+  return (
+    <div className="max-w-5xl mx-auto px-4 py-6">
+      <h2 className="text-xl font-semibold">Clientes</h2>
+      <div className="mt-4 grid md:grid-cols-2 gap-4">
+        {posts.length === 0 && (
+          <div className="col-span-full rounded-2xl border border-dashed border-neutral-300 p-8 text-center text-neutral-600">
+            Nenhum cliente ainda. Clique em “+ Nova”.
+          </div>
+        )}
+        {posts.map((p) => (
+          <article key={p.id} className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm hover:shadow-md transition cursor-pointer" onClick={()=>onOpenDetail(p)}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium">{p.nome}</h3>
+              <span className={`text-xs px-2 py-1 rounded-full border ${statusClasses(p.status)}`}>{labelForStatus(p.status)}</span>
+            </div>
+            <p className="text-sm text-neutral-700">{p.produto || "—"}</p>
+            <p className="text-sm text-neutral-500">{formatDate(p.created_at)}</p>
+            {p.data && (
+              <p className="text-xs text-neutral-500">1º contato: {formatDateOnly(p.data)}</p>
+            )}
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function NewPost({ onCancel, onSave }) {
+  const steps = ["nome","produto","valor","telefone","data","canal","status","observacoes","midia"];
+  const [step, setStep] = useState(0);
+  const [data, setData] = useState({
+    nome:"",
+    produto:"",
+    valor:"",
+    telefone:"",
+    data: todayISO(),
+    canal:CHANNELS[0].value,
+    status:STATUSES[0].value,
+    observacoes:"",
+    midia:[]
+  });
+
+  const next = () => { if (step < steps.length-1) setStep(step+1); else handleSave(); };
+  const back = () => { if (step>0) setStep(step-1); else onCancel(); };
+
+  const handleSave = () => {
+    if (!data.nome) return alert("Informe o nome do cliente");
+    const post = { ...data, id: cryptoRandom(), valor: data.valor ? toBRL(data.valor) : "", created_at: new Date().toISOString() };
+    onSave(post);
+  };
+
+  return (
+    <div className="max-w-sm mx-auto px-4 py-6">
+      <p className="text-sm text-neutral-600 mb-2">Passo {step+1} de {steps.length}</p>
+
+      {steps[step]==="nome" && (
+        <div>
+          <h2 className="text-lg font-semibold mb-2">👤 Nome do Cliente</h2>
+          <input value={data.nome} onChange={e=>setData({...data,nome:e.target.value})} className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm" placeholder="Ex.: Maria Souza" />
+        </div>
+      )}
+
+      {steps[step]==="produto" && (
+        <div>
+          <h2 className="text-lg font-semibold mb-2">📦 Produto sugerido</h2>
+          <input value={data.produto} onChange={e=>setData({...data,produto:e.target.value})} className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm" placeholder="Ex.: Grama sintética" />
+        </div>
+      )}
+
+      {steps[step]==="valor" && (
+        <div>
+          <h2 className="text-lg font-semibold mb-2">💰 Valor da proposta</h2>
+          <input value={data.valor} onChange={e=>setData({...data,valor:e.target.value})} className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm" placeholder="Ex.: 1500" />
+        </div>
+      )}
+
+      {steps[step]==="telefone" && (
+        <div>
+          <h2 className="text-lg font-semibold mb-2">📱 Telefone/WhatsApp</h2>
+          <input value={data.telefone} onChange={e=>setData({...data,telefone:e.target.value})} className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm" placeholder="Ex.: (94) 9 9999-9999" />
+        </div>
+      )}
+
+      {steps[step]==="data" && (
+        <div>
+          <h2 className="text-lg font-semibold mb-2">📅 Data do primeiro contato</h2>
+          <input type="date" value={data.data?.slice(0,10)} onChange={e=>setData({...data,data:e.target.value})} className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm" />
+          <p className="text-xs text-neutral-500 mt-1">Sugerimos a data de hoje; pode ajustar se precisar.</p>
+        </div>
+      )}
+
+      {steps[step]==="canal" && (
+        <div>
+          <h2 className="text-lg font-semibold mb-2">🔊 Canal</h2>
+          <select value={data.canal} onChange={e=>setData({...data,canal:e.target.value})} className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm">
+            {CHANNELS.map(c=><option key={c.value} value={c.value}>{c.label}</option>)}
+          </select>
+        </div>
+      )}
+
+      {steps[step]==="status" && (
+        <div>
+          <h2 className="text-lg font-semibold mb-2">🔄 Status</h2>
+          <select value={data.status} onChange={e=>setData({...data,status:e.target.value})} className={`w-full rounded-xl border px-3 py-2 text-sm ${statusClasses(data.status)}`}>
+            {STATUSES.map(s=><option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+        </div>
+      )}
+
+      {steps[step]==="observacoes" && (
+        <div>
+          <h2 className="text-lg font-semibold mb-2">📝 Observações</h2>
+          <textarea
+            value={data.observacoes}
+            onChange={e=>{ const v = e.target.value.slice(0,500); setData({...data,observacoes:v}); }}
+            rows={5}
+            className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
+            placeholder="Anotações sobre visita/cliente/status (até 500 caracteres)"
+          />
+          <div className="text-xs text-neutral-500 mt-1 text-right">{data.observacoes.length}/500</div>
+        </div>
+      )}
+
+      {steps[step]==="midia" && (
+        <div>
+          <h2 className="text-lg font-semibold mb-2">📷 Adicionar mídia</h2>
+          <input type="file" multiple onChange={(e)=>setData({...data,midia:Array.from(e.target.files)})} className="block w-full text-sm" />
+          {data.midia.length>0 && <p className="mt-1 text-xs text-neutral-600">{data.midia.length} arquivo(s) selecionado(s)</p>}
+        </div>
+      )}
+
+      <div className="flex justify-between mt-6">
+        <button onClick={back} className="px-4 py-2 rounded-xl border border-neutral-300 text-sm">Voltar</button>
+        <button onClick={next} className="px-4 py-2 rounded-xl text-white text-sm" style={{backgroundColor: BRAND_COLOR}}>{step===steps.length-1?"Postar":"Avançar"}</button>
+      </div>
+    </div>
+  );
+}
+
+function Detail({ post, onBack }) {
+  if (!post) return null;
+  const wa = buildWhatsAppLink(post.nome, post.produto);
+  return (
+    <div className="max-w-2xl mx-auto px-4 py-6">
+      <button onClick={onBack} className="mb-4 text-sm underline">← Voltar</button>
+      <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold">{post.nome}</h2>
+          <span className={`text-xs px-2 py-1 rounded-full border ${statusClasses(post.status)}`}>{labelForStatus(post.status)}</span>
+        </div>
+        <div className="mt-3 text-sm text-neutral-700 space-y-1">
+          <p><strong>Produto:</strong> {post.produto || "—"}</p>
+          <p><strong>Valor:</strong> {post.valor || "—"}</p>
+          <p><strong>Telefone:</strong> {post.telefone || "—"}</p>
+          <p><strong>Canal:</strong> {labelForChannel(post.canal)}</p>
+          {post.data && <p><strong>1º contato:</strong> {formatDateOnly(post.data)}</p>}
+          {post.observacoes && <p className="whitespace-pre-wrap"><strong>Observações:</strong> {post.observacoes}</p>}
+          <p className="text-xs text-neutral-500">Criado em {formatDate(post.created_at)}</p>
+        </div>
+        <div className="mt-4 flex gap-2">
+          <a href={wa} target="_blank" rel="noreferrer" className="px-4 py-2 rounded-xl text-white text-sm" style={{backgroundColor: BRAND_COLOR}}>Abrir WhatsApp</a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function App(){
+  const [user,setUser]=useState(null);
+  const [view,setView]=useState("login");
+  const [posts,setPosts]=useState([]);
+  const [current,setCurrent]=useState(null);
+
+  const handleLogin=u=>{setUser(u);setView("feed")};
+  const handleLogout=()=>{setUser(null);setView("login")};
+  const handleNew=()=>setView("new");
+  const handleSave=(post)=>{setPosts([post,...posts]);setView("feed");setCurrent(post)};
+  const openDetail=(p)=>{setCurrent(p);setView("detail")};
+
+  if(view==="login") return <Login onLogin={handleLogin}/>;
+  return (
+    <div className="min-h-screen bg-neutral-50 text-neutral-900">
+      <Header onNew={handleNew} onLogout={handleLogout} />
+      {view==="feed" && <Feed posts={posts} onOpenDetail={openDetail} />}
+      {view==="new" && <NewPost onCancel={()=>setView("feed")} onSave={handleSave} />}
+      {view==="detail" && <Detail post={current} onBack={()=>setView("feed")} />}
+    </div>
+  );
+}
+
+// Utils
+function labelForStatus(v){ return STATUSES.find(s=>s.value===v)?.label || v }
+function labelForChannel(v){ return CHANNELS.find(c=>c.value===v)?.label || v }
+function formatDate(iso){ return new Date(iso).toLocaleString(); }
+function formatDateOnly(iso){ try{ return new Date(iso).toLocaleDateString(); }catch{return iso;} }
+function cryptoRandom(){ return Math.random().toString(36).slice(2) }
+function toBRL(v){ const n=Number(String(v).replace(/\./g,"").replace(",",".")); if(isNaN(n)) return v; return n.toLocaleString("pt-BR",{style:"currency",currency:"BRL"}); }
+function buildWhatsAppLink(nome, produto){
+  const text=encodeURIComponent(`Olá, ${nome}! Sobre ${produto||'sua negociação'}, podemos falar?`);
+  return `https://wa.me/?text=${text}`;
+}
+function todayISO(){ const d = new Date(); d.setHours(0,0,0,0); return d.toISOString(); }
