@@ -1,2 +1,5 @@
-import SimulacaoApp from '../components/App'
-export default function Home() { return <SimulacaoApp /> }
+import App from '../components/App'
+
+export default function Home() {
+  return <App />
+}
